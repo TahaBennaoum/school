@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { getSupabaseClient } from '@/lib/supabase';
 
 export type Role = 'ADMIN' | 'DIRECTOR' | 'TEACHER' | 'STUDENT' | 'PARENT';
+export type UserStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
 
 export interface User {
   id: string;
@@ -11,9 +12,12 @@ export interface User {
   firstName: string;
   lastName: string;
   role: Role;
+  status: UserStatus;
   phone?: string;
   avatar?: string;
   isActive: boolean;
+  rejectionNote?: string;
+  validatedAt?: string;
 }
 
 interface AuthState {
@@ -195,6 +199,7 @@ export const useAuthStore = create<AuthState>()(
                 firstName: session.user.user_metadata?.first_name || 'Utilisateur',
                 lastName: session.user.user_metadata?.last_name || '',
                 role: 'TEACHER',
+                status: 'PENDING',
                 isActive: true,
               };
               set({ user: tempUser, isAuthenticated: true, isLoading: false });
@@ -209,6 +214,7 @@ export const useAuthStore = create<AuthState>()(
               firstName: session.user.user_metadata?.first_name || 'Utilisateur',
               lastName: session.user.user_metadata?.last_name || '',
               role: 'TEACHER',
+              status: 'PENDING',
               isActive: true,
             };
             set({ user: tempUser, isAuthenticated: true, isLoading: false });

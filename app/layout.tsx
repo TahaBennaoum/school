@@ -5,6 +5,7 @@ import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { AuthProvider } from '@/components/providers/auth-provider';
+import { I18nProvider } from '@/components/providers/i18n-provider';
 import './globals.css';
 
 const geistSans = Geist({
@@ -53,12 +54,14 @@ export default function RootLayout({
     <html lang="fr" suppressHydrationWarning className="bg-background">
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
         <ThemeProvider>
-          <QueryProvider>
-            <AuthProvider>
-              {children}
-              <Toaster richColors position="top-right" />
-            </AuthProvider>
-          </QueryProvider>
+          <I18nProvider>
+            <QueryProvider>
+              <AuthProvider>
+                {children}
+                <Toaster richColors position="top-right" />
+              </AuthProvider>
+            </QueryProvider>
+          </I18nProvider>
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

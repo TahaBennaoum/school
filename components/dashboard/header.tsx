@@ -2,14 +2,16 @@
 
 import { useState } from 'react';
 import { useTheme } from 'next-themes';
-import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   Search,
   Bell,
   Sun,
   Moon,
   Menu,
-  X,
+  User,
+  Settings,
+  LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,14 +23,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { LanguageSwitcher } from '@/components/ui/language-switcher';
 import { useUIStore } from '@/store/ui-store';
 import { useAuthStore } from '@/store/auth-store';
 
 export function Header() {
   const { theme, setTheme } = useTheme();
+  const { t } = useTranslation();
   const { sidebarCollapsed, toggleSidebar, unreadNotifications } = useUIStore();
-  const { user } = useAuthStore();
-  const [searchOpen, setSearchOpen] = useState(false);
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = '/login';
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
@@ -46,16 +54,19 @@ export function Header() {
       {/* Search */}
       <div className="flex-1 flex items-center gap-4">
         <div className="relative max-w-md flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-auto rtl:right-3" />
           <Input
-            placeholder="Rechercher etudiants, enseignants, classes..."
-            className="pl-9 bg-muted/50"
+            placeholder={t('common.search')}
+            className="pl-9 rtl:pl-3 rtl:pr-9 bg-muted/50"
           />
         </div>
       </div>
 
       {/* Actions */}
       <div className="flex items-center gap-2">
+        {/* Language Switcher */}
+        <LanguageSwitcher />
+
         {/* Theme Toggle */}
         <Button
           variant="ghost"
@@ -77,17 +88,17 @@ export function Header() {
                   {unreadNotifications > 9 ? '9+' : unreadNotifications}
                 </span>
               )}
-              <span className="sr-only">Notifications</span>
+              <span className="sr-only">{t('nav.notifications')}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('nav.notifications')}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <div className="max-h-80 overflow-y-auto">
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Bell className="h-8 w-8 text-muted-foreground/50 mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  Aucune notification
+                  {t('notifications.noNotifications')}
                 </p>
               </div>
             </div>
@@ -113,11 +124,18 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Mon profil</DropdownMenuItem>
-            <DropdownMenuItem>Parametres</DropdownMenuItem>
+            <DropdownMenuItem>
+              <User className="mr-2 h-4 w-4" />
+              {t('common.profile')}
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Settings className="mr-2 h-4 w-4" />
+              {t('common.settings')}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
-              Deconnexion
+            <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              {t('common.logout')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

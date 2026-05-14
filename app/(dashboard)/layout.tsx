@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { useUIStore } from '@/store/ui-store';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { Header } from '@/components/dashboard/header';
+import { useLanguage } from '@/components/providers/i18n-provider';
 import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({
@@ -17,6 +18,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAuthStore();
   const { sidebarCollapsed } = useUIStore();
+  const { isRTL } = useLanguage();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -47,7 +49,10 @@ export default function DashboardLayout({
       {/* Main Content */}
       <motion.div
         initial={false}
-        animate={{ marginLeft: sidebarCollapsed ? 72 : 260 }}
+        animate={{ 
+          marginLeft: isRTL ? 0 : (sidebarCollapsed ? 72 : 260),
+          marginRight: isRTL ? (sidebarCollapsed ? 72 : 260) : 0,
+        }}
         transition={{ duration: 0.2, ease: 'easeInOut' }}
         className="flex min-h-screen flex-col"
       >

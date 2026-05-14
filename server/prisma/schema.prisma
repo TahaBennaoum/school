@@ -20,6 +20,13 @@ enum Role {
   PARENT
 }
 
+enum UserStatus {
+  PENDING    // En attente de validation
+  APPROVED   // Validé par l'admin
+  REJECTED   // Rejeté par l'admin
+  SUSPENDED  // Suspendu
+}
+
 enum Gender {
   MALE
   FEMALE
@@ -113,17 +120,21 @@ enum NotificationType {
 // ==================== MODELS ====================
 
 model User {
-  id            String    @id @default(cuid())
-  supabaseId    String    @unique
-  email         String    @unique
+  id            String     @id @default(cuid())
+  supabaseId    String     @unique
+  email         String     @unique
   firstName     String
   lastName      String
-  role          Role      @default(TEACHER)
+  role          Role       @default(TEACHER)
+  status        UserStatus @default(PENDING)
   phone         String?
   avatar        String?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  isActive      Boolean    @default(true)
+  rejectionNote String?    // Note when user is rejected
+  validatedAt   DateTime?  // When the user was validated
+  validatedBy   String?    // Admin who validated
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   // Relations optionnelles (un seul sera défini selon le rôle)
   student       Student?
@@ -131,10 +142,15 @@ model User {
   parent        Parent?
 
   notifications Notification[]
+  permissions   UserPermission[]
+  sentMessages     Message[]    @relation("SentMessages")
+  receivedMessages Message[]    @relation("ReceivedMessages")
+  conversations    ConversationParticipant[]
 
   @@index([email])
   @@index([supabaseId])
   @@index([role])
+  @@index([status])
 }
 
 model SchoolYear {
@@ -243,6 +259,7 @@ model Subject {
   teachers      TeacherSubject[]
   schedules     Schedule[]
   grades        Grade[]
+  courses       Course[]
 
   @@index([code])
 }
@@ -385,4 +402,221 @@ model ActivityLog {
   @@index([userId])
   @@index([entity])
   @@index([createdAt])
+}
+
+// ==================== RBAC PERMISSIONS ====================
+
+model Permission {
+  id          String    @id @default(cuid())
+  name        String    @unique  // "students.view", "students.create", etc.
+  description String?
+  module      String    // "students", "teachers", "grades", etc.
+  action      String    // "view", "create", "update", "delete"
+  createdAt   DateTime  @default(now())
+
+  roles       RolePermission[]
+  users       UserPermission[]
+
+  @@index([module])
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  role         Role
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([role, permissionId])
+  @@index([role])
+}
+
+model UserPermission {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  granted      Boolean    @default(true)  // Can be used to revoke specific permissions
+  createdAt    DateTime   @default(now())
+
+  @@unique([userId, permissionId])
+  @@index([userId])
+}
+
+// ==================== MESSAGING SYSTEM ====================
+
+model Conversation {
+  id          String    @id @default(cuid())
+  title       String?
+  isGroup     Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([updatedAt])
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime?
+  joinedAt       DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId     String?      // For direct messages
+  receiver       User?        @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  content        String
+  isRead         Boolean      @default(false)
+  attachments    Json?        // Array of file URLs
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+// ==================== ACADEMIC RESOURCES ====================
+
+model Course {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  subjectId   String
+  subject     Subject   @relation(fields: [subjectId], references: [id])
+  teacherId   String
+  classId     String?
+  level       Level?
+  isPublished Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  resources   Resource[]
+  quizzes     Quiz[]
+
+  @@index([subjectId])
+  @@index([teacherId])
+}
+
+model Resource {
+  id          String       @id @default(cuid())
+  courseId    String
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  type        ResourceType
+  fileUrl     String?
+  linkUrl     String?
+  order       Int          @default(0)
+  createdAt   DateTime     @default(now())
+
+  @@index([courseId])
+}
+
+enum ResourceType {
+  PDF
+  VIDEO
+  AUDIO
+  IMAGE
+  LINK
+  DOCUMENT
+}
+
+// ==================== QUIZZES & EXAMS ====================
+
+model Quiz {
+  id           String       @id @default(cuid())
+  courseId     String?
+  course       Course?      @relation(fields: [courseId], references: [id])
+  title        String
+  description  String?
+  duration     Int?         // Duration in minutes
+  maxAttempts  Int          @default(1)
+  passingScore Decimal?     @db.Decimal(5, 2)
+  isPublished  Boolean      @default(false)
+  startDate    DateTime?
+  endDate      DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  questions    Question[]
+  attempts     QuizAttempt[]
+
+  @@index([courseId])
+}
+
+model Question {
+  id           String       @id @default(cuid())
+  quizId       String
+  quiz         Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  type         QuestionType
+  text         String
+  options      Json?        // Array of options for MCQ
+  correctAnswer Json        // Can be single value or array for multiple correct
+  points       Decimal      @default(1) @db.Decimal(5, 2)
+  explanation  String?
+  order        Int          @default(0)
+  createdAt    DateTime     @default(now())
+
+  answers      Answer[]
+
+  @@index([quizId])
+}
+
+enum QuestionType {
+  MCQ           // Multiple Choice Question
+  TRUE_FALSE    // True/False
+  SHORT_ANSWER  // Short text answer
+  LONG_ANSWER   // Long text answer (essay)
+  FILL_BLANK    // Fill in the blank
+  MATCHING      // Matching pairs
+  ORDERING      // Order items
+}
+
+model QuizAttempt {
+  id          String    @id @default(cuid())
+  quizId      String
+  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  studentId   String
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  score       Decimal?  @db.Decimal(5, 2)
+  maxScore    Decimal?  @db.Decimal(5, 2)
+  isPassed    Boolean?
+  attemptNumber Int     @default(1)
+
+  answers     Answer[]
+
+  @@index([quizId])
+  @@index([studentId])
+}
+
+model Answer {
+  id          String      @id @default(cuid())
+  attemptId   String
+  attempt     QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    Question    @relation(fields: [questionId], references: [id])
+  answer      Json        // Student's answer
+  isCorrect   Boolean?
+  points      Decimal?    @db.Decimal(5, 2)
+  feedback    String?
+  createdAt   DateTime    @default(now())
+
+  @@index([attemptId])
+  @@index([questionId])
 }

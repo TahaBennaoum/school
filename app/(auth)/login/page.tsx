@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuthStore } from '@/store/auth-store';
 
 const loginSchema = z.object({
@@ -22,9 +24,11 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { login } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -36,14 +40,20 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
+    setPendingMessage(null);
     
     const result = await login(data.email, data.password);
     
     if (result.success) {
-      toast.success('Connexion reussie');
+      toast.success(t('auth.loginSuccess'));
       router.push('/');
     } else {
-      toast.error(result.error || 'Erreur de connexion');
+      // Check if error indicates pending status
+      if (result.error?.includes('pending') || result.error?.includes('validation')) {
+        setPendingMessage(t('auth.pendingMessage'));
+      } else {
+        toast.error(result.error || t('errors.somethingWentWrong'));
+      }
     }
     
     setIsLoading(false);
@@ -52,15 +62,22 @@ export default function LoginPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2 text-center">
-        <h2 className="text-2xl font-bold tracking-tight">Connexion</h2>
+        <h2 className="text-2xl font-bold tracking-tight">{t('auth.login')}</h2>
         <p className="text-sm text-muted-foreground">
           Entrez vos identifiants pour acceder a votre compte
         </p>
       </div>
 
+      {pendingMessage && (
+        <Alert className="border-warning/50 bg-warning/10">
+          <AlertCircle className="h-4 w-4 text-warning" />
+          <AlertDescription>{pendingMessage}</AlertDescription>
+        </Alert>
+      )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t('auth.email')}</Label>
           <Input
             id="email"
             type="email"
@@ -76,12 +93,12 @@ export default function LoginPage() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Mot de passe</Label>
+            <Label htmlFor="password">{t('auth.password')}</Label>
             <Link
               href="/forgot-password"
               className="text-sm text-primary hover:underline"
             >
-              Mot de passe oublie?
+              {t('auth.forgotPassword')}
             </Link>
           </div>
           <div className="relative">
@@ -97,7 +114,7 @@ export default function LoginPage() {
               type="button"
               variant="ghost"
               size="sm"
-              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent rtl:right-auto rtl:left-0"
               onClick={() => setShowPassword(!showPassword)}
               disabled={isLoading}
             >
@@ -119,11 +136,11 @@ export default function LoginPage() {
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Connexion en cours...
+              <Loader2 className="mr-2 h-4 w-4 animate-spin rtl:mr-0 rtl:ml-2" />
+              {t('common.loading')}
             </>
           ) : (
-            'Se connecter'
+            t('auth.login')
           )}
         </Button>
       </form>
@@ -134,15 +151,15 @@ export default function LoginPage() {
         </div>
         <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-background px-2 text-muted-foreground">
-            Ou
+            {t('common.or') || 'Ou'}
           </span>
         </div>
       </div>
 
       <p className="text-center text-sm text-muted-foreground">
-        Vous n&apos;avez pas de compte?{' '}
+        {t('auth.dontHaveAccount')}{' '}
         <Link href="/register" className="text-primary hover:underline">
-          Creer un compte
+          {t('auth.register')}
         </Link>
       </p>
 

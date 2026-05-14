@@ -6,17 +6,20 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, CheckCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/store/auth-store';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const registerSchema = z.object({
   firstName: z.string().min(2, 'Le prenom doit contenir au moins 2 caracteres'),
   lastName: z.string().min(2, 'Le nom doit contenir au moins 2 caracteres'),
   email: z.string().email('Adresse email invalide'),
+  phone: z.string().optional(),
   password: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caracteres'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -28,9 +31,11 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { register: registerUser } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [registrationComplete, setRegistrationComplete] = useState(false);
 
   const {
     register,
@@ -48,22 +53,62 @@ export default function RegisterPage() {
       password: data.password,
       firstName: data.firstName,
       lastName: data.lastName,
+      phone: data.phone,
     });
     
     if (result.success) {
-      toast.success('Compte cree avec succes! Verifiez votre email.');
-      router.push('/login');
+      setRegistrationComplete(true);
+      toast.success(t('auth.registerSuccess'));
     } else {
-      toast.error(result.error || 'Erreur lors de la creation du compte');
+      toast.error(result.error || t('errors.somethingWentWrong'));
     }
     
     setIsLoading(false);
   };
 
+  // Show success message after registration
+  if (registrationComplete) {
+    return (
+      <div className="space-y-6">
+        <Alert className="border-success/50 bg-success/10">
+          <CheckCircle className="h-5 w-5 text-success" />
+          <AlertTitle className="text-success">{t('auth.registerSuccess')}</AlertTitle>
+          <AlertDescription className="mt-2">
+            {t('auth.registerPending')}
+          </AlertDescription>
+        </Alert>
+
+        <div className="rounded-lg border border-border bg-card p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning/10">
+              <Clock className="h-5 w-5 text-warning" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-semibold">{t('auth.pendingValidation')}</h3>
+              <p className="text-sm text-muted-foreground">
+                {t('auth.pendingMessage')}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => router.push('/login')}
+          >
+            {t('auth.login')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="space-y-2 text-center">
-        <h2 className="text-2xl font-bold tracking-tight">Creer un compte</h2>
+        <h2 className="text-2xl font-bold tracking-tight">{t('auth.register')}</h2>
         <p className="text-sm text-muted-foreground">
           Remplissez le formulaire pour creer votre compte
         </p>
@@ -72,7 +117,7 @@ export default function RegisterPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="firstName">Prenom</Label>
+            <Label htmlFor="firstName">{t('auth.firstName')}</Label>
             <Input
               id="firstName"
               placeholder="Ahmed"
@@ -86,7 +131,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="lastName">Nom</Label>
+            <Label htmlFor="lastName">{t('auth.lastName')}</Label>
             <Input
               id="lastName"
               placeholder="Benali"
@@ -101,7 +146,7 @@ export default function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t('auth.email')}</Label>
           <Input
             id="email"
             type="email"
@@ -116,7 +161,19 @@ export default function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Mot de passe</Label>
+          <Label htmlFor="phone">{t('common.phone')} ({t('common.optional') || 'Optionnel'})</Label>
+          <Input
+            id="phone"
+            type="tel"
+            placeholder="0555 12 34 56"
+            autoComplete="tel"
+            disabled={isLoading}
+            {...register('phone')}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">{t('auth.password')}</Label>
           <div className="relative">
             <Input
               id="password"
@@ -147,7 +204,7 @@ export default function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
+          <Label htmlFor="confirmPassword">{t('auth.confirmPassword')}</Label>
           <Input
             id="confirmPassword"
             type="password"
@@ -161,6 +218,14 @@ export default function RegisterPage() {
           )}
         </div>
 
+        {/* Info about validation process */}
+        <Alert className="border-info/50 bg-info/10">
+          <Clock className="h-4 w-4 text-info" />
+          <AlertDescription className="text-sm">
+            Apres inscription, votre compte sera examine par un administrateur qui vous attribuera le role approprie.
+          </AlertDescription>
+        </Alert>
+
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? (
             <>
@@ -168,26 +233,26 @@ export default function RegisterPage() {
               Creation en cours...
             </>
           ) : (
-            'Creer mon compte'
+            t('auth.createAccount')
           )}
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted-foreground">
-        Vous avez deja un compte?{' '}
+        {t('auth.alreadyHaveAccount')}{' '}
         <Link href="/login" className="text-primary hover:underline">
-          Se connecter
+          {t('auth.login')}
         </Link>
       </p>
 
       <p className="text-center text-xs text-muted-foreground">
-        En creant un compte, vous acceptez nos{' '}
+        {t('auth.termsAccept')}{' '}
         <Link href="/terms" className="underline hover:text-foreground">
-          conditions d&apos;utilisation
+          {t('auth.termsOfService')}
         </Link>{' '}
-        et notre{' '}
+        {t('auth.and')}{' '}
         <Link href="/privacy" className="underline hover:text-foreground">
-          politique de confidentialite
+          {t('auth.privacyPolicy')}
         </Link>
         .
       </p>

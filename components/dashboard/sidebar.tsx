@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   Users,
@@ -19,46 +20,59 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  MessageSquare,
+  BookMarked,
+  FileQuestion,
+  UserCheck,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 import { useUIStore } from '@/store/ui-store';
-import { useAuthStore, useIsStaff, useIsDirector } from '@/store/auth-store';
+import { useAuthStore } from '@/store/auth-store';
+import { usePermissions } from '@/hooks/use-permissions';
+import type { Permission } from '@/lib/rbac/permissions';
 
 interface NavItem {
-  title: string;
+  titleKey: string;
   href: string;
   icon: React.ElementType;
-  roles?: string[];
+  permission?: Permission;
+  badge?: number;
 }
 
 const navItems: NavItem[] = [
-  { title: 'Tableau de bord', href: '/', icon: LayoutDashboard },
-  { title: 'Etudiants', href: '/students', icon: Users },
-  { title: 'Enseignants', href: '/teachers', icon: GraduationCap, roles: ['ADMIN', 'DIRECTOR'] },
-  { title: 'Classes', href: '/classes', icon: BookOpen },
-  { title: 'Salles', href: '/rooms', icon: Building2, roles: ['ADMIN', 'DIRECTOR'] },
-  { title: 'Emploi du temps', href: '/schedule', icon: Calendar },
-  { title: 'Absences', href: '/attendance', icon: ClipboardList },
-  { title: 'Notes', href: '/grades', icon: FileText },
-  { title: 'Paiements', href: '/payments', icon: CreditCard, roles: ['ADMIN', 'DIRECTOR'] },
-  { title: 'Notifications', href: '/notifications', icon: Bell },
-  { title: 'Parametres', href: '/settings', icon: Settings },
+  { titleKey: 'nav.dashboard', href: '/', icon: LayoutDashboard, permission: 'dashboard.view' },
+  { titleKey: 'nav.students', href: '/students', icon: Users, permission: 'students.view' },
+  { titleKey: 'nav.teachers', href: '/teachers', icon: GraduationCap, permission: 'teachers.view' },
+  { titleKey: 'nav.classes', href: '/classes', icon: BookOpen, permission: 'classes.view' },
+  { titleKey: 'nav.rooms', href: '/rooms', icon: Building2, permission: 'rooms.view' },
+  { titleKey: 'nav.schedule', href: '/schedule', icon: Calendar, permission: 'schedule.view' },
+  { titleKey: 'nav.attendance', href: '/attendance', icon: ClipboardList, permission: 'attendance.view' },
+  { titleKey: 'nav.grades', href: '/grades', icon: FileText, permission: 'grades.view' },
+  { titleKey: 'nav.courses', href: '/courses', icon: BookMarked, permission: 'courses.view' },
+  { titleKey: 'nav.quizzes', href: '/quizzes', icon: FileQuestion, permission: 'quizzes.view' },
+  { titleKey: 'nav.payments', href: '/payments', icon: CreditCard, permission: 'payments.view' },
+  { titleKey: 'nav.messages', href: '/messages', icon: MessageSquare, permission: 'messages.view' },
+  { titleKey: 'nav.notifications', href: '/notifications', icon: Bell, permission: 'notifications.view' },
+  { titleKey: 'nav.reports', href: '/reports', icon: BarChart3, permission: 'reports.view' },
+  { titleKey: 'nav.userValidation', href: '/admin/users', icon: UserCheck, permission: 'user_validation.view' },
+  { titleKey: 'nav.settings', href: '/settings', icon: Settings, permission: 'settings.view' },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { t } = useTranslation();
   const { sidebarCollapsed, setSidebarCollapsed } = useUIStore();
   const { user, logout } = useAuthStore();
-  const isStaff = useIsStaff();
-  const isDirector = useIsDirector();
+  const { can } = usePermissions();
 
   const filteredNavItems = navItems.filter((item) => {
-    if (!item.roles) return true;
-    if (!user) return false;
-    return item.roles.includes(user.role);
+    if (!item.permission) return true;
+    return can(item.permission);
   });
 
   const handleLogout = async () => {
@@ -72,7 +86,7 @@ export function Sidebar() {
         initial={false}
         animate={{ width: sidebarCollapsed ? 72 : 260 }}
         transition={{ duration: 0.2, ease: 'easeInOut' }}
-        className="fixed left-0 top-0 z-40 h-screen border-r border-sidebar-border bg-sidebar"
+        className="fixed left-0 top-0 z-40 h-screen border-r border-sidebar-border bg-sidebar rtl:left-auto rtl:right-0 rtl:border-l rtl:border-r-0"
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
@@ -101,9 +115,9 @@ export function Sidebar() {
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             >
               {sidebarCollapsed ? (
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4 rtl:rotate-180" />
               ) : (
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
               )}
             </Button>
           </div>
@@ -133,12 +147,17 @@ export function Sidebar() {
                           initial={{ opacity: 0, width: 0 }}
                           animate={{ opacity: 1, width: 'auto' }}
                           exit={{ opacity: 0, width: 0 }}
-                          className="whitespace-nowrap overflow-hidden"
+                          className="whitespace-nowrap overflow-hidden flex-1"
                         >
-                          {item.title}
+                          {t(item.titleKey)}
                         </motion.span>
                       )}
                     </AnimatePresence>
+                    {!sidebarCollapsed && item.badge && item.badge > 0 && (
+                      <Badge variant="secondary" className="ml-auto">
+                        {item.badge}
+                      </Badge>
+                    )}
                   </Link>
                 );
 
@@ -147,7 +166,12 @@ export function Sidebar() {
                     <Tooltip key={item.href}>
                       <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
                       <TooltipContent side="right" className="font-medium">
-                        {item.title}
+                        <div className="flex items-center gap-2">
+                          {t(item.titleKey)}
+                          {item.badge && item.badge > 0 && (
+                            <Badge variant="secondary">{item.badge}</Badge>
+                          )}
+                        </div>
                       </TooltipContent>
                     </Tooltip>
                   );
@@ -180,11 +204,7 @@ export function Sidebar() {
                         {user.firstName} {user.lastName}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {user.role === 'ADMIN' && 'Administrateur'}
-                        {user.role === 'DIRECTOR' && 'Directeur'}
-                        {user.role === 'TEACHER' && 'Enseignant'}
-                        {user.role === 'STUDENT' && 'Etudiant'}
-                        {user.role === 'PARENT' && 'Parent'}
+                        {t(`roles.${user.role}`)}
                       </p>
                     </motion.div>
                   )}
@@ -211,14 +231,14 @@ export function Sidebar() {
                         exit={{ opacity: 0, width: 0 }}
                         className="whitespace-nowrap overflow-hidden"
                       >
-                        Deconnexion
+                        {t('common.logout')}
                       </motion.span>
                     )}
                   </AnimatePresence>
                 </Button>
               </TooltipTrigger>
               {sidebarCollapsed && (
-                <TooltipContent side="right">Deconnexion</TooltipContent>
+                <TooltipContent side="right">{t('common.logout')}</TooltipContent>
               )}
             </Tooltip>
           </div>
